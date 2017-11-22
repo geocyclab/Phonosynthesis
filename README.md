@@ -1,10 +1,2 @@
 # Phonosynthesis
-Dans ce terrarium cohabitent un ensemble de plantes de sous bois avec un dispositif de captation développé pour analyser le processus de photosynthèse. Le système est composé de huit capteurs (CO2 - O2 - hygrométrie interne - hygrométrie externe - humidité du sol - température interne - température externe - luminosité). Ces capteurs produisent des données en temps réel qui sont analysées, traitées, puis envoyées à un synthétiseur virtuel open source.
-
-Used electronique hardware for this project:
-
-Arduino:
-
-Raspi:
-
-Other:
+In this terrarium coexist a set of undergrowth plants with a capture device developed to analyze the process of photosynthesis. The system consists of eight sensors (CO2 - O2 - internal hygrometry - external hygrometry - soil moisture - internal temperature - external temperature - brightness). These sensors produce real-time data that is analyzed, processed, and sent to an open source virtual synthesizer made with Puredata.
