@@ -1,0 +1,15 @@
+OS:Raspian
+sudo apt-get install puredata (installation de puredata)
+sudo apt-get install pd-zexy pd-pdstring pd-comport (installation des libraries)
+
+Dans le fichier /etc/rc.local qui permet de lancer un programme en au boot du raspberry, j'ai collé la commande: 
+pd -nogui -audiodev 3 -audiobuf 1000 -lib pdstring -lib comport -lib zexy -open /home/pi/art-installation/patch.pd
+        
+"art-installation" est le répertoire dans lequel je met l'ensemble des patchs et abstractions PureData et "patch.pd" est tout simplement le patch principal qu'il faut lancer pour démarrer le bordel.
+        
+J'ai laisser tomber la visualisation via l'écran LCD pour 2 raison:
+- Je galère à installer les drivers 
+- J'ai tester la visualisation via Gem et ça bouffe à fond de ressources et j'ai peur que le RPI ne tienne pas la route.
+
+
+Il me reste à copier l'image de cet OS puis à changer le nom et le mot de passe du Raspi.
