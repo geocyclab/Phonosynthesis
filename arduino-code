@@ -1,0 +1,293 @@
+/*****************************************************************************************************************************************************************
+Hardware:
+
+Analog pins:
+A0= DHT11 - TEMP & HYGRO sensor     // http://wiki.seeed.cc/Grove-Temperature_and_Humidity_Sensor_Pro/
+A2= DHT11 - TEMP & HYGRO sensor     // http://wiki.seeed.cc/Grove-Temperature_and_Humidity_Sensor_Pro/
+A5= LIGHT sensor - Photoresistor    // http://wiki.seeed.cc/Grove-Light_Sensor/
+A6= Moisture Sensor                 // http://wiki.seeed.cc/Grove-Moisture_Sensor/
+A8= O2 sensor                       // http://wiki.seeed.cc/Grove-Gas_Sensor-O2/
+UART pin 19 -18 = CO2 sensor        // https://www.dfrobot.com/wiki/index.php/Infrared_CO2_Sensor_0-50000ppm_SKU:_SEN0220
+I2C - RTC DS1307                    // http://wiki.seeed.cc/Grove-RTC/
+SPI= SD CARD                        // https://www.sparkfun.com/products/13743
+
+*******************************************************************************************************************************************************************/
+
+// First, calling libraries
+#include "Wire.h"                   // https://www.arduino.cc/en/reference/wire
+#include "DHT.h"                    // https://github.com/adafruit/DHT-sensor-library
+#include "SoftwareSerial.h"
+#include "RTClib.h"                 // https://github.com/adafruit/RTClib
+#include "SPI.h"                    // https://www.arduino.cc/en/reference/SPI
+#include "SD.h"                     // https://www.arduino.cc/en/reference/SD
+#include "string.h"                 // https://www.arduino.cc/en/Reference/StringObject
+#include "RGBdriver.h"
+          
+//----------A0 + A2 -DHT-11-TEMP-&-HYGRO-sensor------------------------------------------------------------------------------------------------------------------//
+#define DHTPININ A2                 // what pin we're connected to TEMP-&-HYGRO inside
+#define DHTPINOUT A0                // what pin we're connected to TEMP-&-HYGRO outside
+#define DHTTYPEIN DHT11             // DHT 11 inside 
+#define DHTTYPEOUT DHT11            // DHT 11 outside
+DHT dhtin(DHTPININ, DHTTYPEIN);
+DHT dhtout(DHTPINOUT, DHTTYPEOUT);
+
+//----------A4-LIGHT-sensor--------------------------------------------------------------------------------------------------------------------------------------//
+#define lightPin A4                 // Light sensor attached to A4
+int Valuelight = 0;                 //set light value to 0 by default
+int outputlight = 0; 
+
+//----------A6-Moisture-sensor-----------------------------------------------------------------------------------------------------------------------------------//
+int moisturePin = A6;               // select the input pin for the potentiometer
+int moistureValue = 0;              // variable to store the value coming from the sensor7
+int moistureMap = 0;
+
+//----------A8-O2-sensor-----------------------------------------------------------------------------------------------------------------------------------------//
+byte incomingByte;
+
+//----------A10-CO2-sensor---------------------------------------------------------------------------------------------------------------------------------------//
+SoftwareSerial mySerial(10, 11); // RX, TX
+unsigned char hexdata[9] = {0xFF,0x01,0x86,0x00,0x00,0x00,0x00,0x00,0x79}; //Read the gas density command /Don't change the order
+
+//----------SDA-SCL-RTC-DS1307------------------------------------------------------------------------------------------------------------------------------------//
+RTC_DS1307 rtc;                     //Real Time Clock
+char daysOfTheWeek[7][12] = {
+"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
+//----------A12 LIGHT-SIMULATION-------------------------------------------------------------------------------------------------------------------------------------------//
+#define CLK 2//pins definitions for the driver        
+#define DIO 3
+RGBdriver Driver(CLK,DIO);
+const int sunPin = A12;
+int sunValue = 0;        // value read from the pot
+int i = 0;
+
+//----------SPI-SD-CARD-------------------------------------------------------------------------------------------------------------------------------------------//
+int led = 8;
+File fileSD;
+char filename[] = "000000000000.CSV"; // this also determines the length of name
+
+/***********SETUP**************************************************************************************************************************************************/
+
+void setup(){
+//----------SERIAL MONITOR----------------------------------------------------------------------------------------------------------------------------------------//
+  Serial.begin(9600);                      //setup serial monitor to 9600 bauds
+
+//----------A0 + A2 -DHT-11-TEMP-&-HYGRO-sensor-------------------------------------------------------------------------------------------------------------------//
+  dhtin.begin();
+  dhtout.begin();
+ 
+//----------A10-CO2-sensor-----------------------------------------------------------------------------------------------------------------------------------------//
+  while (!Serial) {
+  }
+  mySerial.begin(9600);
+
+//----------SDA-SCL-RTC-DS1307-------------------------------------------------------------------------------------------------------------------------------------//
+  if (! rtc.begin()) {                      
+    Serial.println("Couldn't find RTC");   // test real time clock
+    while (1);
+    }
+  if (! rtc.isrunning()) {
+    Serial.println("RTC is NOT running!");
+    }
+  
+//----------SPI-SD-CARD--------------------------------------------------------------------------------------------------------------------------------------------//
+  pinMode(led, OUTPUT);
+ 
+  // Instance initialisation
+  if(!SD.begin(53)) {
+    Serial.println(F("SD card initialisation: FAIL !!"));  
+    
+    Serial.println ("SD card: FAIL !!");
+    Serial.println ("Check your card");
+    return;
+    }
+  Serial.println(F("Initialisation OK"));
+  Serial.println ("SD card:OK");
+  Serial.println ("Writing:OK");  
+  
+  delay(1500);
+  getfilename();   
+}
+
+void getfilename(){
+  DateTime now = rtc.now();
+  sprintf(filename, "%02d%02d%02d%02d.csv", now.month(), now.day(), now.hour(),now.minute());    // Turns file_today_name into date.csv format
+  
+} 
+
+
+/***********LOOP***************************************************************************************************************************************************/
+void loop() {
+  
+//----------SPI-SD-CARD-------------------------------------------------------------------------------------------------------------------------------------------//
+  fileSD = SD.open(filename, FILE_WRITE); // open a new file
+
+  if(fileSD) {
+  digitalWrite(led, HIGH); // turn the LED on (HIGH is the voltage level)
+  delay (20);
+  digitalWrite(led, LOW);
+  
+  fileSD.close(); // close the file when the device is shutting down
+  }
+
+//----------A0 + A2 -DHT-11-TEMP-&-HYGRO-sensor-------------------------------------------------------------------------------------------------------------------//
+  float hin = dhtin.readHumidity();
+  float tin = dhtin.readTemperature();
+  float hout = dhtout.readHumidity();
+  float tout = dhtout.readTemperature();                     // get value of temperature
+  
+  //Serial.print("Hygrometry: ");                            // print "Hygrpmetry  "
+  Serial.print(hout);                                        // print hygrometry value in % from the sensor
+  Serial.print("\t");
+  //Serial.print("Temperature: ");                           // print "Temperatue:  "
+  Serial.print(tout);                                        // print temperature value in C° from the sensor
+  Serial.print("\t");
+  //Serial.print("Hygrometry: ");                            // print "Hygrpmetry  "
+  Serial.print(hin);                                        // print hygrometry value in % from the sensor
+  Serial.print("\t");
+  //Serial.print("Temperature: ");                           // print "Temperatue:  "
+  Serial.print(tin);                                        // print temperature value in C° from the sensor
+  Serial.print("\t");
+  //Serial.print("Hygrometry: ");                       
+  Serial.print(hin-hout);                                    
+  Serial.print("\t");                                   
+  //Serial.print("Temperature: ");                      
+  Serial.print(tin-tout);                                      
+  Serial.print("\t"); 
+  
+  //fileSD.print("Hygrometry: ");                            // print "Hygrpmetry  "
+  fileSD.print(hout);                                        // print hygrometry value in % from the sensor
+  fileSD.print("\t");                                        // space 
+  //filesSD.print("Temperature: ");                           // print "Temperatue:  "
+  fileSD.print(tout);                                        // print temperature value in C° from the sensor
+  fileSD.print("\t");
+  //fileSD.print("Hygrometry: ");                            // print "Hygrpmetry  "
+  fileSD.print(hin);                                        // print hygrometry value in % from the sensor
+  fileSD.print("\t");                                        // space 
+  //filesSD.print("Temperature: ");                           // print "Temperatue:  "
+  fileSD.print(tin);                                        // print temperature value in C° from the sensor
+  fileSD.print("\t");
+//----------A4-LIGHT-sensor---------------------------------------------------------------------------------------------------------------------------------------//
+  Valuelight = analogRead(lightPin);                         // read the light sensor value
+  outputlight = map(Valuelight, 0, 1023, 0, 100);            // transpose analog value to %  
+  
+  //Serial.print("Light:  " );                               // print "Light  "
+  Serial.print(outputlight);                                 // print the light value in % from the sensor
+  Serial.print("\t");                                        // space
+  
+  //fileSD.print("Light:  " );                               // print "Light  "
+  fileSD.print(outputlight);                                 // print the light value in % from the sensor
+  fileSD.print("\t");
+  
+//----------A6-MOISTURE-sensor------------------------------------------------------------------------------------------------------------------------------------//
+  moistureValue = analogRead(moisturePin);
+  moistureMap= map(moistureValue, 0, 1024, 0, 100);
+  
+  //Serial.print("moisture = " );
+  Serial.print(moistureMap);
+  Serial.print("\t");
+  
+  //fileSD.print("moisture = " );
+  fileSD.print(moistureMap);
+  fileSD.print("\t");
+ 
+//-----------CO2-sensor----------------------------------------------------------------------------------------------------------------------------------------// 
+  mySerial.write(hexdata,9);
+  delay(500);
+
+  for(int i=0,j=0;i<9;i++)
+  {
+    if (mySerial.available()>0)
+    {
+    long hi,lo,CO2;
+    int ch=mySerial.read();
+  
+    if(i==2){     hi=ch;   }   //High concentration
+    if(i==3){     lo=ch;   }   //Low concentration
+    if(i==8) {
+               CO2=hi*256+lo;  //CO2 concentration
+      //Serial.print("CO2 concentration: ");
+      Serial.print(CO2);
+      Serial.print("\t");
+      
+      //fileSD.print("CO2 concentration: ");
+      fileSD.print(CO2);
+      fileSD.print("\t");
+      }  
+    }
+  }
+ 
+ //----------A8-O2-sensor------------------------------------------------------------------------------------------------------------------------------------------// 
+float O2sensorValue;
+float O2sensorVoltage;
+float Value_O2;
+
+O2sensorValue=analogRead(A8);
+O2sensorVoltage=(O2sensorValue/1024)*5.0;
+O2sensorVoltage=O2sensorVoltage/201*10000;
+Value_O2=O2sensorVoltage/7.43;
+
+Serial.print(Value_O2,1);
+Serial.print("\t");
+
+
+if (Serial.available()) {
+
+// set the values to the ‘incomingByte’ variable
+incomingByte = Serial.read();
+
+Serial.print(incomingByte);
+fileSD.print(incomingByte);
+}
+
+ //----------LIGHT-SIMULATION---------------------------------------------------------------------------------------------------------------------------------------// 
+  sunValue = analogRead(sunPin); 
+  i = map(sunValue, 0, 1023, 0, 255);
+  
+  Driver.begin(); // begin
+  Driver.SetColor(0,0,i); //Blue. First node data. SetColor(R,G,B)
+  Driver.end();
+  
+  //Serial.print("sensor = " );                       
+  //Serial.print(sunValue);      
+  //Serial.print("\t ledstrip");      
+  //Serial.println(i);
+  
+//----------SDA-SCL-RTC-DS1307------------------------------------------------------------------------------------------------------------------------------------//
+  DateTime now = rtc.now();   
+  
+  Serial.print(now.hour(), DEC);                        // print hour from RTC
+  Serial.print("\t");                                   // space
+  Serial.print(now.minute(), DEC);                      // print minute from RTC
+  Serial.print("\t");                                   // space
+  Serial.print(now.second(), DEC);                      // print second from RTC
+  Serial.print("\t");                                   // space
+  
+  Serial.print(now.day(), DEC);                         // print day from RTC
+  Serial.print("\t");                                   // space
+  Serial.print(now.month(), DEC);                       // print month from RTC
+  Serial.print("\t");                                   // space
+  Serial.print(now.year(), DEC);                        // print year from RTC
+  Serial.print("\t");                                   // space
+  
+  Serial.println (daysOfTheWeek[now.dayOfTheWeek()]);   // print day of the week from RTC  
+  
+  fileSD.print(now.hour(), DEC);                        // print hour from RTC
+  fileSD.print("\t");                                   // space
+  fileSD.print(now.minute(), DEC);                      // print minute from RTC
+  fileSD.print("\t");                                   // space
+  fileSD.print(now.second(), DEC);                      // print second from RTC
+  fileSD.print("\t");                                   // space
+  
+  fileSD.print(now.day(), DEC);                         // print day from RTC
+  fileSD.print("\t");                                   // space
+  fileSD.print(now.month(), DEC);                       // print month from RTC
+  fileSD.print("\t");                                   // space
+  fileSD.print(now.year(), DEC);                        // print year from RTC
+  fileSD.print("\t");                                   // space
+  
+  fileSD.println (daysOfTheWeek[now.dayOfTheWeek()]);   // print day of the week from RTC   
+}
+
+
+
